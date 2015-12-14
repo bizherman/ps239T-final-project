@@ -1,0 +1,238 @@
+---
+title: "Final Project PS239T: Polarity"
+author: "Biz Herman"
+date: "December 9, 2015"
+output: html_document
+---
+
+# First we have to prepare the data.
+
+```{r, cache=TRUE}
+
+# set working directory
+setwd("/Users/elizabeth/Documents/Berkeley/PS239T/ps239T-final-project")
+
+# import the csv with the articles
+PP_NYT <- read.csv("/Users/elizabeth/Documents/Berkeley/PS239T/ps239T-final-project/Data/PP_NYT.csv")
+
+# subset the variables that are meaningful, create new dataset to work with
+pp <- subset(PP_NYT, select=c(DATE, TITLE, LENGTH, GRAPHIC, SECTION, BYLINE, DATELINE, TEXT))
+names(pp)
+
+# create a new date variable that will represent the article date in YYYY-MM-DD format
+date <- as.character(pp$DATE)
+betterDates <- as.Date(date, format = "%B %d, %Y")
+pp$date.num <- betterDates
+
+# create a variable for just the year each article was published
+year = NULL
+pp$year <- substr(pp$date.num, 1, 4)
+
+# create a variable for the year and month each article was published
+yearmonth = NULL
+pp$yearmonth <- substr(pp$date.num, 1, 7)
+
+```
+
+# Polarity Analysis
+
+Now we're going to look at the polarity of the articles on Planned Parenthood, as it changes over time. Though we're using this analysis on Planned Parenthood articles, we could really use this on any corpus, to analyze how the polarity of a set of documents have changed over a given variable---be it time, from document to document, by person, and so on.
+
+```{r, cache = TRUE, results="hide"}
+
+# load the libraries we will need for this section
+library(qdap) # quantiative discourse analysis of transcripts
+library(data.table) # for easier data manipulation
+library(scales) # to help us plot
+library(plyr)
+
+# subset the data for 2009 and later, for an initial analysis of the polarity trends
+pp.2010 <- subset(pp, pp$year > 2009)
+
+# then run this line of code below (i've had to hide the entire chunk below, because it was printing the entire output)
+# split the texts into individual sentences
+# pp.split <- sentSplit(pp.2010, "TEXT")
+
+```
+
+
+```{r, cache = TRUE, results="hide", include=FALSE}
+
+# split the texts into individual sentences
+pp.split <- sentSplit(pp.2010, "TEXT")
+
+```
+
+
+```{r, cache=TRUE, warning=FALSE}
+
+pp.split$yearmonth <- substr(pp.split$date.num, 1, 7)
+
+# look at the result
+head(truncdf(pp.split),10)
+
+# calculate polarity / sentiment of each line
+# (ppdat <- with(pp.split, polarity(TEXT, TITLE)))
+
+ppdat.2 <- with(pp.split, polarity(TEXT, yearmonth))
+head(ppdat.2$group$ave.polarity)
+
+# look at the results
+counts(ppdat.2)[1:10,]
+
+# 
+
+```
+
+We can represent this relationship graphically, as follows:
+
+```{r}
+
+library(ggplot2) # plotting discourse data
+
+# plot it
+pp.plot <- data.frame(yearmonth = ppdat.2$group$yearmonth, pol = ppdat.2$group$ave.polarity)
+
+colorado <- subset(pp.plot, yearmonth == "2015-11")
+lilarose <- subset(pp.plot, yearmonth == "2011-02")
+cmp <- subset(pp.plot, yearmonth == "2015-08")
+
+ggplot(data = pp.plot, aes(x = yearmonth, y = pol)) + geom_point() + geom_smooth(aes(group=1)) +
+  theme(axis.text.x = element_text(angle = -90)) + 
+  ylab("Average Polarity") + xlab("Date") + 
+  geom_point(data=colorado, colour="red") +
+  geom_text(data=colorado, label="CO PP Shooting", vjust=1.5, hjust = 1, color = "red") + 
+  geom_point(data=lilarose, colour="blue") +
+  geom_text(data=lilarose, label="LiveAction Sex Traffic", vjust=1.5, hjust = 1, color = "blue") +
+  geom_point(data=cmp, colour="purple") +
+  geom_text(data=cmp, label="CMP Release", vjust=1.5, hjust = 1, color = "purple") +
+  geom_hline(aes()) + 
+  geom_vline(xintercept=25, linetype="dashed", color = "blue") + 
+  geom_vline(xintercept=79, linetype="dashed", color = "purple") + 
+  geom_vline(xintercept=82, linetype="dashed", color = "red") +
+  scale_x_discrete(breaks = levels(ppdat.2$group$yearmonth)[c(T, rep(F, 2))])
+
+```
+
+Let's expand the timeline to the beginning of 2000.
+
+```{r, cache = TRUE, }
+
+# subset the data for 2009 and later, for an initial analysis of the polarity trends
+pp.2000 <- subset(pp, pp$year > 1999)
+
+# then run this line of code below (i've had to hide the entire chunk below, because it was printing the entire output)
+# split the texts into individual sentences
+# pp.split.2000 <- sentSplit(pp.2000, "TEXT")
+
+```
+
+
+```{r, cache = TRUE, results="hide", include=FALSE}
+
+# split the texts into individual sentences
+pp.split.2000 <- sentSplit(pp.2000, "TEXT")
+
+```
+
+
+
+```{r, cache = TRUE, warning=FALSE}
+
+pp.split.2000$yearmonth <- substr(pp.split.2000$date.num, 1, 7)
+
+# look at the result
+head(truncdf(pp.split.2000),10)
+
+# calculate polarity / sentiment of each line
+# (ppdat <- with(pp.split, polarity(TEXT, TITLE)))
+
+ppdat.2000 <- with(pp.split.2000, polarity(TEXT, yearmonth))
+head(ppdat.2000$group$ave.polarity)
+
+# look at the results
+counts(ppdat.2)[1:10,]
+
+# plot it
+pp.plot.2000 <- data.frame(yearmonth = ppdat.2000$group$yearmonth, pol = ppdat.2000$group$ave.polarity)
+
+colorado <- subset(pp.plot.2000, yearmonth == "2015-11")
+lilarose <- subset(pp.plot.2000, yearmonth == "2011-02")
+cmp <- subset(pp.plot.2000, yearmonth == "2015-08")
+
+ggplot(data = pp.plot.2000, aes(x = yearmonth, y = pol)) + geom_point() + geom_smooth(aes(group=1)) +
+  theme(axis.text.x = element_text(angle = -90)) + 
+  ylab("Average Polarity") + xlab("Date") + 
+  geom_point(data=colorado, colour="red") +
+  geom_text(data=colorado, label="CO PP Shooting", vjust=1.5, hjust = 1, color = "red") + 
+  geom_point(data=lilarose, colour="blue") +
+  geom_text(data=lilarose, label="LiveAction Sex Traffic", vjust=1.5, hjust = 1, color = "blue") +
+  geom_point(data=cmp, colour="purple") +
+  geom_text(data=cmp, label="CMP Release", vjust=1.5, hjust = 1, color = "purple") +
+  geom_hline(aes()) + 
+  geom_vline(xintercept=133, linetype="dashed", color = "blue") + 
+  geom_vline(xintercept=187, linetype="dashed", color = "purple") + 
+  geom_vline(xintercept=190, linetype="dashed", color = "red") +
+  scale_x_discrete(breaks = levels(ppdat.2000$group$yearmonth)[c(T, rep(F, 4))])
+  
+```
+
+
+Now we can complete this analysis on a larger subset of the data, from 1982 to the present.
+
+```{r, cache=TRUE, results="hide"}
+
+# subset the data for 1982 and later, for an initial analysis of the polarity trends
+pp.1982 <- subset(pp, pp$year > 1982)
+
+# split the texts into individual sentences
+# cannot suppress this output for some reason!! to get beyond the immense amount of output, command-F "pp.split.1982$yearmonth <- substr(pp.split.1982$date.num, 1, 7)", which is the next line of code!
+
+# then run this line of code below (i've had to hide the entire chunk below, because it was printing the entire output)
+# split the texts into individual sentences
+# pp.split.1982 <- sentSplit(pp.1982, "TEXT")
+
+```
+
+
+```{r, cache = TRUE, results="hide", include=FALSE}
+
+# split the texts into individual sentences
+pp.split.1982 <- sentSplit(pp.1982, "TEXT")
+
+```
+
+
+```{r, cache=TRUE, warning=FALSE}
+
+pp.split.1982$yearmonth <- substr(pp.split.1982$date.num, 1, 7)
+
+# look at the result
+head(truncdf(pp.split.1982),10)
+
+# calculate polarity / sentiment of each line
+ppdat.1982 <- with(pp.split.1982, polarity(TEXT, yearmonth))
+head(ppdat.1982$group$ave.polarity)
+
+# look at the results
+counts(ppdat.1982)[1:10,]
+
+```
+
+And plot it.
+
+```{r}
+
+library(ggplot2) # plotting discourse data
+
+# plot it
+pp.plot.1982 <- data.frame(yearmonth = ppdat.1982$group$yearmonth, pol = ppdat.1982$group$ave.polarity)
+
+ggplot(data = pp.plot.1982, aes(x = yearmonth, y = pol)) + geom_point() + geom_smooth(aes(group=1)) +
+  theme(axis.text.x = element_text(angle = -90)) + 
+  ylab("Average Polarity") + xlab("Date") +
+  geom_hline(aes()) + 
+  scale_x_discrete(breaks = levels(ppdat.1982$group$yearmonth)[c(T, rep(F, 7))])
+
+```
+

@@ -1,0 +1,10 @@
+base
+qdapDictionaries
+qdapRegex
+qdapTools
+RColorBrewer
+qdap
+ggplot2
+data.table
+scales
+plyr

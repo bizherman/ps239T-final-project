@@ -1,0 +1,566 @@
+---
+title: "Final Project PS239T: Topic Modeling"
+author: "Biz Herman"
+date: "December 9, 2015"
+output: html_document
+---
+
+# First we have to prepare the data.
+
+```{r}
+
+# import the csv with the articles
+PP_NYT <- read.csv("/Users/elizabeth/Documents/Berkeley/PS239T/ps239T-final-project/Data/PP_NYT.csv")
+
+# subset the variables that are meaningful, create new dataset to work with
+pp <- subset(PP_NYT, select=c(DATE, TITLE, LENGTH, GRAPHIC, SECTION, BYLINE, DATELINE, TEXT))
+names(pp)
+
+# create a new date variable that will represent the article date in YYYY-MM-DD format
+date <- as.character(pp$DATE)
+betterDates <- as.Date(date, format = "%B %d, %Y")
+pp$date.num <- betterDates
+
+# create a variable for just the year each article was published
+year = NULL
+pp$year <- substr(pp$date.num, 1, 4)
+
+# create a variable for the year and month each article was published
+yearmonth = NULL
+pp$yearmonth <- substr(pp$date.num, 1, 7)
+
+```
+
+# Topic Modeling Analysis
+
+Now we're going to look at the polarity of the articles on Planned Parenthood, as it changes over time. Though we're using this analysis on Planned Parenthood articles, we could really use this on any corpus, to analyze how the polarity of a set of documents have changed over a given variable---be it time, from document to document, by person, and so on.
+
+```{r}
+
+set.seed(1234)
+
+# load the libraries we will need for this section
+library(mallet) # a wrapper around the Java machine learning tool MALLET
+library(wordcloud) # to visualize wordclouds
+
+# subset the data for 2009 and later, for an initial analysis of the topic models
+pp.2010 <- subset(pp, pp$year > 2009)
+
+# we first have to create an 'id' column
+pp.2010$id <- rownames(pp.2010)
+
+# remove punctuation
+pp.2010$TEXT <- gsub(pattern="[[:punct:]]",replacement=" ",pp.2010$TEXT)
+
+
+# load data into mallet
+mallet.instances <- mallet.import(pp.2010$id, pp.2010$TEXT, "/Users/elizabeth/Documents/Berkeley/PS239T/ps239T-final-project/Data/stoplist.csv", FALSE, token.regexp="[\\p{L}']+")
+
+# choose the number of topics to model
+n.topics = 10
+
+# create a topic trainer object
+topic.model <- MalletLDA(n.topics)
+
+# load the documents
+topic.model$loadDocuments(mallet.instances)
+
+# get the vocabulary, and some statistics about word frequencies; after running this code once through, i went back and re-curated the stop word lists, to remove some of the more frequently used words that weren't otherwise caught
+vocabulary <- topic.model$getVocabulary()
+word.freqs <- mallet.word.freqs(topic.model)
+
+# examine some of the vocabulary
+word.freqs[1:50,]
+
+# the most frequently used words
+word.freqs.ordered <- word.freqs[order(-word.freqs$term.freq), ]
+head(word.freqs.ordered)
+
+# optimize hyperparameters every 20 iterations, after 50 burn-in iterations
+topic.model$setAlphaOptimization(20, 50)
+
+# now train a model, specifying the number of iterations
+topic.model$train(100)
+
+# get the probability of topics in documents and the probability of words in topics; by default the functions return word counts, so to get the probabilities we can normalize and add smoothing, in order to ensure that nothing has a probability of exactly 0
+doc.topics <- mallet.doc.topics(topic.model, smoothed=T, normalized=T)
+topic.words <- mallet.topic.words(topic.model, smoothed=T, normalized=T)
+
+# what are the top words in topic 5?
+mallet.top.words(topic.model, topic.words[4,])
+
+# create a vector containing short names for the topics
+topics.labels <- rep("", n.topics)
+for (topic in 1:n.topics) topics.labels[topic] <- paste(mallet.top.words(topic.model, topic.words[topic,], num.top.words=5)$words, collapse=" ")
+
+# have a look at keywords for each topic
+topics.labels
+
+# show the first few document titles with at least .25 of its content devoted to topic 1
+head(pp.2010$TITLE[ doc.topics[1,] > 0.25 ],10)
+
+# create a vector that has the title of the most representative text for each topic
+topics.articles <- rep("", n.topics)
+for (i in 1:n.topics) topics.articles[i] <- paste(pp.2010[which.max(doc.topics[i, ]), ]$TITLE)
+
+# weirdly, many of the topics have the same text that is most representative
+topics.articles
+
+# now let's look at how topics differ across different years?
+topic.words.2009 <- mallet.subset.topic.words(topic.model, pp.2010$year == 2009, smoothed=T, normalized=T)
+topic.words.2010 <- mallet.subset.topic.words(topic.model, pp.2010$year == 2010, smoothed=T, normalized=T)
+topic.words.2011 <- mallet.subset.topic.words(topic.model, pp.2010$year == 2011, smoothed=T, normalized=T)
+topic.words.2012 <- mallet.subset.topic.words(topic.model, pp.2010$year == 2012, smoothed=T, normalized=T)
+topic.words.2013 <- mallet.subset.topic.words(topic.model, pp.2010$year == 2013, smoothed=T, normalized=T)
+topic.words.2014 <- mallet.subset.topic.words(topic.model, pp.2010$year == 2014, smoothed=T, normalized=T)
+topic.words.2015 <- mallet.subset.topic.words(topic.model, pp.2010$year == 2015, smoothed=T, normalized=T)
+
+topics.labels.2010 <- rep("", n.topics)
+for (topic in 1:n.topics) topics.labels.2010[topic] <- paste(mallet.top.words(topic.model, topic.words.2010[topic,], num.top.words=5)$words, collapse=" ")
+topics.labels.2010
+
+topics.labels.2011 <- rep("", n.topics)
+for (topic in 1:n.topics) topics.labels.2011[topic] <- paste(mallet.top.words(topic.model, topic.words.2011[topic,], num.top.words=5)$words, collapse=" ")
+topics.labels.2011
+
+topics.labels.2012 <- rep("", n.topics)
+for (topic in 1:n.topics) topics.labels.2012[topic] <- paste(mallet.top.words(topic.model, topic.words.2012[topic,], num.top.words=5)$words, collapse=" ")
+topics.labels.2012
+
+topics.labels.2013 <- rep("", n.topics)
+for (topic in 1:n.topics) topics.labels.2013[topic] <- paste(mallet.top.words(topic.model, topic.words.2013[topic,], num.top.words=5)$words, collapse=" ")
+topics.labels.2013
+
+topics.labels.2014 <- rep("", n.topics)
+for (topic in 1:n.topics) topics.labels.2014[topic] <- paste(mallet.top.words(topic.model, topic.words.2014[topic,], num.top.words=5)$words, collapse=" ")
+topics.labels.2014
+
+topics.labels.2015 <- rep("", n.topics)
+for (topic in 1:n.topics) topics.labels.2015[topic] <- paste(mallet.top.words(topic.model, topic.words.2015[topic,], num.top.words=5)$words, collapse=" ")
+topics.labels.2015
+
+# vectorize them
+t.2010 <- as.vector(topics.labels.2010)
+t.2011 <- as.vector(topics.labels.2011)
+t.2012 <- as.vector(topics.labels.2012)
+t.2013 <- as.vector(topics.labels.2013)
+t.2014 <- as.vector(topics.labels.2014)
+t.2015 <- as.vector(topics.labels.2015)
+
+# view all the topics as they change over the years
+topics.over.time <- cbind(t.2010, t.2011, t.2012, t.2013, t.2014, t.2015)
+
+# look at each topic individually -- the first topic over the years
+topics.over.time[1, ]
+
+# the second!
+topics.over.time[2, ]
+
+# the third
+topics.over.time[3, ]
+
+# the fourth
+topics.over.time[4, ]
+
+# the fifth
+topics.over.time[5, ]
+
+# the sixth
+topics.over.time[6, ]
+
+# the seventh
+topics.over.time[7, ]
+
+# the eighth
+topics.over.time[8, ]
+
+# the ninth
+topics.over.time[9, ]
+
+# the tenth
+topics.over.time[10, ]
+
+```
+
+We can represent this relationship visually, as follows:
+
+```{r, warning=FALSE}
+
+# with the wordcloud package
+topic.num <- 1
+num.top.words<-100
+topic.top.words <- mallet.top.words(topic.model, topic.words[1,], 100)
+wordcloud(topic.top.words$words, topic.top.words$weights, c(4,.8), rot.per=0, random.order=F, colors = "red", ordered.colors = T)
+
+num.topics<-10
+num.top.words<-25
+for(i in 1:num.topics){
+  topic.top.words <- mallet.top.words(topic.model, topic.words[i,], num.top.words)
+  wordcloud(topic.top.words$words, topic.top.words$weights, c(4,.8), rot.per=0, random.order=F, colors = "red", ordered.colors = T)
+}
+
+```
+
+And creating a cluster dendogram.
+
+```{r}
+
+# from http://www.cs.princeton.edu/~mimno/R/clustertrees.R
+
+# transpose and normalize the doc topics
+topic.docs <- t(doc.topics)
+topic.docs <- topic.docs / rowSums(topic.docs)
+write.csv(topic.docs, "/Users/elizabeth/Documents/Berkeley/PS239T/ps239T-final-project/Results/topic-docs.csv")
+
+# Get a vector containing short names for the topics
+topics.labels <- rep("", n.topics)
+for (topic in 1:n.topics) topics.labels[topic] <- paste(mallet.top.words(topic.model, topic.words[topic,],
+                                                                         num.top.words=5)$words, collapse=" ")
+# have a look at keywords for each topic
+topics.labels
+write.csv(topics.labels, "/Users/elizabeth/Documents/Berkeley/PS239T/ps239T-final-project/Results/topic-labels.csv")
+
+# create data.frame with columns as docs and rows as topics
+topic_docs <- data.frame(topic.docs)
+names(topic_docs) <- pp.2010$id
+
+# cluster based on shared words
+plot(hclust(dist(topic.words)), labels=topics.labels)
+
+```
+
+Now we can complete this analysis on a larger subset of the data, from 1982 to the present.
+
+```{r}
+
+set.seed(12345)
+
+# load the libraries we will need for this section
+library(mallet) # a wrapper around the Java machine learning tool MALLET
+library(wordcloud) # to visualize wordclouds
+
+# subset the data for 1982 and later, the dates for which we have the complete data
+pp.1982 <- subset(pp, pp$year > 1982)
+
+# we first have to create an 'id' column
+pp.1982$id <- rownames(pp.1982)
+
+# remove punctuation
+pp.1982$TEXT <- gsub(pattern="[[:punct:]]",replacement=" ", pp.1982$TEXT)
+
+# load data into mallet
+mallet.instances <- mallet.import(pp.1982$id, pp.1982$TEXT, "/Users/elizabeth/Documents/Berkeley/PS239T/ps239T-final-project/Data/stoplist.csv", FALSE, token.regexp="[\\p{L}']+")
+
+# decide what number of topics to model
+n.topics = 10
+
+# create a topic trainer object.
+topic.model <- MalletLDA(n.topics)
+
+# load our documents
+topic.model$loadDocuments(mallet.instances)
+
+# get the vocabulary, and some statistics about word frequencies. these may be useful in further curating the stopword list.
+vocabulary <- topic.model$getVocabulary()
+word.freqs <- mallet.word.freqs(topic.model)
+
+# examine some of the vocabulary
+word.freqs[1:50,]
+
+# the most frequently used words
+word.freqs.ordered <- word.freqs[order(-word.freqs$term.freq), ]
+head(word.freqs.ordered)
+
+# optimize hyperparameters every 20 iterations, after 50 burn-in iterations.
+topic.model$setAlphaOptimization(20, 50)
+
+# now train a model. Note that hyperparameter optimization is on, by default. We can specify the number of iterations. Here we'll use a large-ish round number.
+topic.model$train(100)
+
+# get the probability of topics in documents and the probability of words in topics; by default the functions return word counts, so to get the probabilities we can normalize and add smoothing, in order to ensure that nothing has a probability of exactly 0
+doc.topics <- mallet.doc.topics(topic.model, smoothed=T, normalized=T)
+topic.words <- mallet.topic.words(topic.model, smoothed=T, normalized=T)
+
+# what are the top words in topic 7?
+mallet.top.words(topic.model, topic.words[6,])
+
+# Get a vector containing short names for the topics
+topics.labels <- rep("", n.topics)
+for (topic in 1:n.topics) topics.labels[topic] <- paste(mallet.top.words(topic.model, topic.words[topic,], num.top.words=5)$words, collapse=" ")
+
+# have a look at keywords for each topic
+topics.labels
+
+# show the first few document titles with at least .25 of its content devoted to topic 1
+head(pp.1982$TITLE[ doc.topics[1,] > 0.25 ],10)
+
+# create a vector that has the title of the most representative text for each topic
+topics.articles <- rep("", n.topics)
+for (i in 1:n.topics) topics.articles[i] <- paste(pp.1982[which.max(doc.topics[i, ]), ]$TITLE)
+
+# weirdly, many of the topics have the same text that is most representative
+topics.articles
+
+# now let's look at how topics differ across different years?
+topic.words.1983 <- mallet.subset.topic.words(topic.model, pp.1982$year == 1983, smoothed=T, normalized=T)
+topic.words.1984 <- mallet.subset.topic.words(topic.model, pp.1982$year == 1984, smoothed=T, normalized=T)
+topic.words.1985 <- mallet.subset.topic.words(topic.model, pp.1982$year == 1985, smoothed=T, normalized=T)
+topic.words.1986 <- mallet.subset.topic.words(topic.model, pp.1982$year == 1986, smoothed=T, normalized=T)
+topic.words.1987 <- mallet.subset.topic.words(topic.model, pp.1982$year == 1987, smoothed=T, normalized=T)
+topic.words.1988 <- mallet.subset.topic.words(topic.model, pp.1982$year == 1988, smoothed=T, normalized=T)
+topic.words.1989 <- mallet.subset.topic.words(topic.model, pp.1982$year == 1989, smoothed=T, normalized=T)
+topic.words.1990 <- mallet.subset.topic.words(topic.model, pp.1982$year == 1990, smoothed=T, normalized=T)
+topic.words.1991 <- mallet.subset.topic.words(topic.model, pp.1982$year == 1991, smoothed=T, normalized=T)
+topic.words.1992 <- mallet.subset.topic.words(topic.model, pp.1982$year == 1992, smoothed=T, normalized=T)
+topic.words.1993 <- mallet.subset.topic.words(topic.model, pp.1982$year == 1993, smoothed=T, normalized=T)
+topic.words.1994 <- mallet.subset.topic.words(topic.model, pp.1982$year == 1994, smoothed=T, normalized=T)
+topic.words.1995 <- mallet.subset.topic.words(topic.model, pp.1982$year == 1995, smoothed=T, normalized=T)
+topic.words.1996 <- mallet.subset.topic.words(topic.model, pp.1982$year == 1996, smoothed=T, normalized=T)
+topic.words.1997 <- mallet.subset.topic.words(topic.model, pp.1982$year == 1997, smoothed=T, normalized=T)
+topic.words.1998 <- mallet.subset.topic.words(topic.model, pp.1982$year == 1998, smoothed=T, normalized=T)
+topic.words.1999 <- mallet.subset.topic.words(topic.model, pp.1982$year == 1999, smoothed=T, normalized=T)
+topic.words.2000 <- mallet.subset.topic.words(topic.model, pp.1982$year == 2000, smoothed=T, normalized=T)
+topic.words.2001 <- mallet.subset.topic.words(topic.model, pp.1982$year == 2001, smoothed=T, normalized=T)
+topic.words.2002 <- mallet.subset.topic.words(topic.model, pp.1982$year == 2002, smoothed=T, normalized=T)
+topic.words.2003 <- mallet.subset.topic.words(topic.model, pp.1982$year == 2003, smoothed=T, normalized=T)
+topic.words.2004 <- mallet.subset.topic.words(topic.model, pp.1982$year == 2004, smoothed=T, normalized=T)
+topic.words.2005 <- mallet.subset.topic.words(topic.model, pp.1982$year == 2005, smoothed=T, normalized=T)
+topic.words.2006 <- mallet.subset.topic.words(topic.model, pp.1982$year == 2006, smoothed=T, normalized=T)
+topic.words.2007 <- mallet.subset.topic.words(topic.model, pp.1982$year == 2007, smoothed=T, normalized=T)
+topic.words.2008 <- mallet.subset.topic.words(topic.model, pp.1982$year == 2008, smoothed=T, normalized=T)
+topic.words.2009 <- mallet.subset.topic.words(topic.model, pp.1982$year == 2009, smoothed=T, normalized=T)
+topic.words.2010 <- mallet.subset.topic.words(topic.model, pp.1982$year == 2010, smoothed=T, normalized=T)
+topic.words.2011 <- mallet.subset.topic.words(topic.model, pp.1982$year == 2011, smoothed=T, normalized=T)
+topic.words.2012 <- mallet.subset.topic.words(topic.model, pp.1982$year == 2012, smoothed=T, normalized=T)
+topic.words.2013 <- mallet.subset.topic.words(topic.model, pp.1982$year == 2013, smoothed=T, normalized=T)
+topic.words.2014 <- mallet.subset.topic.words(topic.model, pp.1982$year == 2014, smoothed=T, normalized=T)
+topic.words.2015 <- mallet.subset.topic.words(topic.model, pp.1982$year == 2015, smoothed=T, normalized=T)
+
+topics.labels.1983 <- rep("", n.topics)
+for (topic in 1:n.topics) topics.labels.1983[topic] <- paste(mallet.top.words(topic.model, topic.words.1983[topic,], num.top.words=5)$words, collapse=" ")
+
+topics.labels.1984 <- rep("", n.topics)
+for (topic in 1:n.topics) topics.labels.1984[topic] <- paste(mallet.top.words(topic.model, topic.words.1984[topic,], num.top.words=5)$words, collapse=" ")
+
+topics.labels.1985 <- rep("", n.topics)
+for (topic in 1:n.topics) topics.labels.1985[topic] <- paste(mallet.top.words(topic.model, topic.words.1985[topic,], num.top.words=5)$words, collapse=" ")
+
+topics.labels.1986 <- rep("", n.topics)
+for (topic in 1:n.topics) topics.labels.1986[topic] <- paste(mallet.top.words(topic.model, topic.words.1986[topic,], num.top.words=5)$words, collapse=" ")
+
+topics.labels.1987 <- rep("", n.topics)
+for (topic in 1:n.topics) topics.labels.1987[topic] <- paste(mallet.top.words(topic.model, topic.words.1987[topic,], num.top.words=5)$words, collapse=" ")
+
+topics.labels.1988 <- rep("", n.topics)
+for (topic in 1:n.topics) topics.labels.1988[topic] <- paste(mallet.top.words(topic.model, topic.words.1988[topic,], num.top.words=5)$words, collapse=" ")
+
+topics.labels.1989 <- rep("", n.topics)
+for (topic in 1:n.topics) topics.labels.1989[topic] <- paste(mallet.top.words(topic.model, topic.words.1989[topic,], num.top.words=5)$words, collapse=" ")
+
+topics.labels.1990 <- rep("", n.topics)
+for (topic in 1:n.topics) topics.labels.1990[topic] <- paste(mallet.top.words(topic.model, topic.words.1990[topic,], num.top.words=5)$words, collapse=" ")
+
+topics.labels.1991 <- rep("", n.topics)
+for (topic in 1:n.topics) topics.labels.1991[topic] <- paste(mallet.top.words(topic.model, topic.words.1991[topic,], num.top.words=5)$words, collapse=" ")
+
+topics.labels.1992 <- rep("", n.topics)
+for (topic in 1:n.topics) topics.labels.1992[topic] <- paste(mallet.top.words(topic.model, topic.words.1992[topic,], num.top.words=5)$words, collapse=" ")
+
+topics.labels.1993 <- rep("", n.topics)
+for (topic in 1:n.topics) topics.labels.1993[topic] <- paste(mallet.top.words(topic.model, topic.words.1993[topic,], num.top.words=5)$words, collapse=" ")
+
+topics.labels.1994 <- rep("", n.topics)
+for (topic in 1:n.topics) topics.labels.1994[topic] <- paste(mallet.top.words(topic.model, topic.words.1994[topic,], num.top.words=5)$words, collapse=" ")
+
+topics.labels.1995 <- rep("", n.topics)
+for (topic in 1:n.topics) topics.labels.1995[topic] <- paste(mallet.top.words(topic.model, topic.words.1995[topic,], num.top.words=5)$words, collapse=" ")
+
+topics.labels.1996 <- rep("", n.topics)
+for (topic in 1:n.topics) topics.labels.1996[topic] <- paste(mallet.top.words(topic.model, topic.words.1996[topic,], num.top.words=5)$words, collapse=" ")
+
+topics.labels.1997 <- rep("", n.topics)
+for (topic in 1:n.topics) topics.labels.1997[topic] <- paste(mallet.top.words(topic.model, topic.words.1997[topic,], num.top.words=5)$words, collapse=" ")
+
+topics.labels.1998 <- rep("", n.topics)
+for (topic in 1:n.topics) topics.labels.1998[topic] <- paste(mallet.top.words(topic.model, topic.words.1998[topic,], num.top.words=5)$words, collapse=" ")
+
+topics.labels.1999 <- rep("", n.topics)
+for (topic in 1:n.topics) topics.labels.1999[topic] <- paste(mallet.top.words(topic.model, topic.words.1999[topic,], num.top.words=5)$words, collapse=" ")
+
+topics.labels.2000 <- rep("", n.topics)
+for (topic in 1:n.topics) topics.labels.2000[topic] <- paste(mallet.top.words(topic.model, topic.words.2000[topic,], num.top.words=5)$words, collapse=" ")
+
+topics.labels.2001 <- rep("", n.topics)
+for (topic in 1:n.topics) topics.labels.2001[topic] <- paste(mallet.top.words(topic.model, topic.words.2001[topic,], num.top.words=5)$words, collapse=" ")
+
+topics.labels.2002 <- rep("", n.topics)
+for (topic in 1:n.topics) topics.labels.2002[topic] <- paste(mallet.top.words(topic.model, topic.words.2002[topic,], num.top.words=5)$words, collapse=" ")
+
+topics.labels.2003 <- rep("", n.topics)
+for (topic in 1:n.topics) topics.labels.2003[topic] <- paste(mallet.top.words(topic.model, topic.words.2003[topic,], num.top.words=5)$words, collapse=" ")
+
+topics.labels.2004 <- rep("", n.topics)
+for (topic in 1:n.topics) topics.labels.2004[topic] <- paste(mallet.top.words(topic.model, topic.words.2004[topic,], num.top.words=5)$words, collapse=" ")
+
+topics.labels.2005 <- rep("", n.topics)
+for (topic in 1:n.topics) topics.labels.2005[topic] <- paste(mallet.top.words(topic.model, topic.words.2005[topic,], num.top.words=5)$words, collapse=" ")
+
+topics.labels.2006 <- rep("", n.topics)
+for (topic in 1:n.topics) topics.labels.2006[topic] <- paste(mallet.top.words(topic.model, topic.words.2006[topic,], num.top.words=5)$words, collapse=" ")
+
+topics.labels.2007 <- rep("", n.topics)
+for (topic in 1:n.topics) topics.labels.2007[topic] <- paste(mallet.top.words(topic.model, topic.words.2007[topic,], num.top.words=5)$words, collapse=" ")
+
+topics.labels.2008 <- rep("", n.topics)
+for (topic in 1:n.topics) topics.labels.2008[topic] <- paste(mallet.top.words(topic.model, topic.words.2008[topic,], num.top.words=5)$words, collapse=" ")
+
+topics.labels.2009 <- rep("", n.topics)
+for (topic in 1:n.topics) topics.labels.2009[topic] <- paste(mallet.top.words(topic.model, topic.words.2009[topic,], num.top.words=5)$words, collapse=" ")
+
+topics.labels.2010 <- rep("", n.topics)
+for (topic in 1:n.topics) topics.labels.2010[topic] <- paste(mallet.top.words(topic.model, topic.words.2010[topic,], num.top.words=5)$words, collapse=" ")
+
+topics.labels.2011 <- rep("", n.topics)
+for (topic in 1:n.topics) topics.labels.2011[topic] <- paste(mallet.top.words(topic.model, topic.words.2011[topic,], num.top.words=5)$words, collapse=" ")
+
+topics.labels.2012 <- rep("", n.topics)
+for (topic in 1:n.topics) topics.labels.2012[topic] <- paste(mallet.top.words(topic.model, topic.words.2012[topic,], num.top.words=5)$words, collapse=" ")
+
+topics.labels.2013 <- rep("", n.topics)
+for (topic in 1:n.topics) topics.labels.2013[topic] <- paste(mallet.top.words(topic.model, topic.words.2013[topic,], num.top.words=5)$words, collapse=" ")
+
+topics.labels.2014 <- rep("", n.topics)
+for (topic in 1:n.topics) topics.labels.2014[topic] <- paste(mallet.top.words(topic.model, topic.words.2014[topic,], num.top.words=5)$words, collapse=" ")
+
+topics.labels.2015 <- rep("", n.topics)
+for (topic in 1:n.topics) topics.labels.2015[topic] <- paste(mallet.top.words(topic.model, topic.words.2015[topic,], num.top.words=5)$words, collapse=" ")
+
+# vectorize them
+t.1983 <- as.vector(topics.labels.1983)
+t.1984 <- as.vector(topics.labels.1984)
+t.1985 <- as.vector(topics.labels.1985)
+t.1986 <- as.vector(topics.labels.1986)
+t.1987 <- as.vector(topics.labels.1987)
+t.1988 <- as.vector(topics.labels.1988)
+t.1989 <- as.vector(topics.labels.1989)
+t.1990 <- as.vector(topics.labels.1990)
+t.1991 <- as.vector(topics.labels.1991)
+t.1992 <- as.vector(topics.labels.1992)
+t.1993 <- as.vector(topics.labels.1993)
+t.1994 <- as.vector(topics.labels.1994)
+t.1995 <- as.vector(topics.labels.1995)
+t.1996 <- as.vector(topics.labels.1996)
+t.1997 <- as.vector(topics.labels.1997)
+t.1998 <- as.vector(topics.labels.1998)
+t.1999 <- as.vector(topics.labels.1999)
+t.2001 <- as.vector(topics.labels.2001)
+t.2002 <- as.vector(topics.labels.2002)
+t.2003 <- as.vector(topics.labels.2003)
+t.2004 <- as.vector(topics.labels.2004)
+t.2005 <- as.vector(topics.labels.2005)
+t.2000 <- as.vector(topics.labels.2000)
+t.2001 <- as.vector(topics.labels.2001)
+t.2002 <- as.vector(topics.labels.2002)
+t.2003 <- as.vector(topics.labels.2003)
+t.2004 <- as.vector(topics.labels.2004)
+t.2005 <- as.vector(topics.labels.2005)
+t.2006 <- as.vector(topics.labels.2006)
+t.2007 <- as.vector(topics.labels.2007)
+t.2008 <- as.vector(topics.labels.2008)
+t.2009 <- as.vector(topics.labels.2009)
+t.2010 <- as.vector(topics.labels.2010)
+t.2011 <- as.vector(topics.labels.2011)
+t.2012 <- as.vector(topics.labels.2012)
+t.2013 <- as.vector(topics.labels.2013)
+t.2014 <- as.vector(topics.labels.2014)
+t.2015 <- as.vector(topics.labels.2015)
+
+# create a matrix with all the topics over time
+topics.over.time <- cbind(t.1983, t.1984, t.1985, t.1986, t.1987, t.1988, t.1989, t.1990, t.1991, t.1992, t.1993, t.1994, t.1995, t.1996, t.1997, t.1998, t.1999, t.2000, t.2001, t.2002, t.2003, t.2004, t.2005, t.2006, t.2007, t.2008, t.2009, t.2010, t.2011, t.2012, t.2013, t.2014, t.2015)
+
+```
+
+Now we can look at how the topics have changed over the years, to see if Planned Parenthood has become a more politicized issue over time, or perhaps during certain election cycles.
+
+```{r}
+
+# look at each topic individually -- the first topic over the years
+topics.over.time[1, ]
+
+# the second!
+topics.over.time[2, ]
+
+# the third
+topics.over.time[3, ]
+
+# the fourth
+topics.over.time[4, ]
+
+# the fifth
+topics.over.time[5, ]
+
+# the sixth
+topics.over.time[6, ]
+
+# the seventh
+topics.over.time[7, ]
+
+# the eighth
+topics.over.time[8, ]
+
+# the ninth
+topics.over.time[9, ]
+
+# the tenth
+topics.over.time[10, ]
+
+```
+
+The ninth topic is especially interesting---it appears to track scandals or politicized issues that Planned Parenthood is embroiled in. To take a peek at how that has changed over the years, we can see that in 1985, the most common words in the topic were "bours public office called investigation." In 1993, they were "death suicide public told office." In 1999, they were "kopp smith web death site." In 2006, they were "death kline group found called." In 2012, they were "told video case web kimbrough." And in 2015, they were "tissue fetal video planned people." We can also trace changes in the topic that's about the Supreme Court, in the topic that's about election, in the topic that's about sex education---these prove to be very informative topics from which we can build interesting additional research questions!
+
+We can also represent this topics visually, as follows:
+
+```{r, warning=FALSE}
+
+# with the wordcloud package
+topic.num <- 1
+num.top.words<-100
+topic.top.words <- mallet.top.words(topic.model, topic.words[1,], 100)
+wordcloud(topic.top.words$words, topic.top.words$weights, c(4,.8), rot.per=0, random.order=F, colors = "red", ordered.colors = T)
+
+num.topics<-10
+num.top.words<-25
+for(i in 1:num.topics){
+  topic.top.words <- mallet.top.words(topic.model, topic.words[i,], num.top.words)
+  wordcloud(topic.top.words$words, topic.top.words$weights, c(4,.8), rot.per=0, random.order=F, colors = "red", ordered.colors = T)
+}
+
+```
+
+And create a cluster dendogram.
+
+```{r}
+
+# from http://www.cs.princeton.edu/~mimno/R/clustertrees.R
+
+# transpose and normalize the doc topics
+topic.docs <- t(doc.topics)
+topic.docs <- topic.docs / rowSums(topic.docs)
+write.csv(topic.docs, "/Users/elizabeth/Documents/Berkeley/PS239T/ps239T-final-project/Results/topic-docs2.csv")
+
+# Get a vector containing short names for the topics
+topics.labels <- rep("", n.topics)
+for (topic in 1:n.topics) topics.labels[topic] <- paste(mallet.top.words(topic.model, topic.words[topic,],
+                                                                         num.top.words=5)$words, collapse=" ")
+# have a look at keywords for each topic
+topics.labels
+write.csv(topics.labels, "/Users/elizabeth/Documents/Berkeley/PS239T/ps239T-final-project/Results/topic-labels2.csv")
+
+# create data.frame with columns as docs and rows as topics
+topic_docs <- data.frame(topic.docs)
+names(topic_docs) <- pp.1982$id
+
+# cluster based on shared words
+plot(hclust(dist(topic.words)), labels=topics.labels)
+
+```

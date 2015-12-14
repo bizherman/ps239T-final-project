@@ -43,12 +43,18 @@ List all other files contained in the repo, along with a brief description of ea
 
 #### Results
 
-1. Graphic_PPDendogram.pdf: Dendogram produced in 04_TopicModeling.Rmd, summarizing relationship of various topics generated.
-2. Graphic_PPSince2000.pdf: Tracking sentiment analysis from 2000 to the present.
-3. Graphic_PPSince2009.pdf: Tracking sentiment analysis from 2009 to the present.
-4. Graphic_PPWCAllArticles.png: Wordcloud of the most common words used in all articles on Planned Parenthood.
-5. Graphic_PPWCAllTopics.png: Wordcloud of the most common words used in each topic generated in 04_TopicModeling.Rmd on articles on Planned Parenthood.
-6. PS239T_Presentation.html: Presentation given to PS239T summarizing results.
+1. Graphic_PPDendogram.png: Dendogram produced in 04_TopicModeling.Rmd, summarizing relationship of various topics generated.
+2. Graphic_PPSince1982.png: 
+3. Graphic_PPSince2000.png: Tracking sentiment analysis from 2000 to the present.
+4. Graphic_PPSince2009.png: Tracking sentiment analysis from 2009 to the present.
+5. Graphic_PPWCAllArticles.png: Wordcloud of the most common words used in all articles on Planned Parenthood.
+6. Graphic_PPWCAllTopics.png: Wordcloud of the most common words used in each topic generated in 04_TopicModeling.Rmd on articles on Planned Parenthood.
+7. PS239T_Presentation.html: Presentation given to PS239T summarizing results.
+8. topic-docs.csv: Transposing and normalizing the document topics for the smaller subset of articles, from 2010 to 2015.
+9. topic-docs2.csv: Transposing and normalizing the document topics for the entire set of artciles, from 1982 to 2015.
+10. topic-labels.csv: The topic labels for the smaller subset of articles, from 2010 to 2015.
+11. topic-labels2.csv: The topic labels for the entire set of articles, from 1982 to 2015.
+
 
 ## More Information
 

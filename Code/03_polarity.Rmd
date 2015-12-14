@@ -112,6 +112,8 @@ ggplot(data = pp.plot, aes(x = yearmonth, y = pol)) + geom_point() + geom_smooth
   geom_vline(xintercept=82, linetype="dashed", color = "red") +
   scale_x_discrete(breaks = levels(ppdat.2$group$yearmonth)[c(T, rep(F, 2))])
 
+ggsave(file = "Graphic_PPSince2009.png")
+
 ```
 
 Let's expand the timeline to the beginning of 2000.
@@ -174,7 +176,9 @@ ggplot(data = pp.plot.2000, aes(x = yearmonth, y = pol)) + geom_point() + geom_s
   geom_vline(xintercept=187, linetype="dashed", color = "purple") + 
   geom_vline(xintercept=190, linetype="dashed", color = "red") +
   scale_x_discrete(breaks = levels(ppdat.2000$group$yearmonth)[c(T, rep(F, 4))])
-  
+
+ggsave(file = "Graphic_PPSince2000.png")
+
 ```
 
 
@@ -233,6 +237,8 @@ ggplot(data = pp.plot.1982, aes(x = yearmonth, y = pol)) + geom_point() + geom_s
   ylab("Average Polarity") + xlab("Date") +
   geom_hline(aes()) + 
   scale_x_discrete(breaks = levels(ppdat.1982$group$yearmonth)[c(T, rep(F, 7))])
+
+ggsave(file = "Graphic_PPSince1982.png")
 
 ```
 

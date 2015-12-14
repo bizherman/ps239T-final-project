@@ -530,6 +530,7 @@ wordcloud(topic.top.words$words, topic.top.words$weights, c(4,.8), rot.per=0, ra
 
 num.topics<-10
 num.top.words<-25
+
 for(i in 1:num.topics){
   topic.top.words <- mallet.top.words(topic.model, topic.words[i,], num.top.words)
   wordcloud(topic.top.words$words, topic.top.words$weights, c(4,.8), rot.per=0, random.order=F, colors = "red", ordered.colors = T)
@@ -561,6 +562,8 @@ topic_docs <- data.frame(topic.docs)
 names(topic_docs) <- pp.1982$id
 
 # cluster based on shared words
+png('Graphic_PPDendogram.png')
 plot(hclust(dist(topic.words)), labels=topics.labels)
+dev.off()
 
 ```
